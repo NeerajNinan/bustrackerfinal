@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bus Tracking System</title>
+    <style>
+body {
+            font-family: 'Baskerville', serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background-color: #88AB8E;
+        }
+
+        header {
+            background-color: #88AB8E;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+        }
+
+        #content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px;
+        }
+
+        #map {
+            height: 70vh;
+            width: 80%;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #bus-info {
+            background-color: #F2F1EB;
+            padding: 20px;
+            max-width: 400px;
+            margin-left: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #bus-info h2 {
+            color: #000000;
+            margin-bottom: 15px;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: calc(100% - 20px);
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #000000;
+            color: #fff;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .bus-item {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: background-color 0.3s ease-in-out;
+        }
+
+        .bus-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        footer {
+            background-color: E1C78F;
+            color: #fff;
+            padding: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Bus Tracking System</h1>
+    </header>
+
+    <div id="content">
+        <div id="map"></div>
+
+        <div id="bus-info">
+            <h2>Bus Information</h2>
+            <input type="text" id="bus-search" placeholder="Enter your Stop">
+            <button onclick="searchBuses()">Search Buses</button>
+            <ul id="bus-list"></ul>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Bus Tracking System</p>
+    </footer>
+
+    <script>
+        let map;
+        let userMarker;
+        let markers = [];
+
+        const busData = [
+            { id: 1, name: 'Bus P', latitude: 8.54083117, longitude: 76.903746385, route: 'A' },
+            { id: 2, name: 'Bus Q', latitude: 8.558831098, longitude: 76.939496242, route: 'B' },
+            { id: 3, name: 'Bus R', latitude: 8.56775, longitude:76.873516, route: 'C' },
+            { id: 4, name: 'Bus S', latitude: 8.524139, longitude: 76.936638, route: 'D' },
+            { id: 5, name: 'Bus T', latitude:8.682756, longitude: 76.909565, route: 'E' },
+        ];
+
+        // Define stops for each route
+        const routeStops = {
+            A: [1, 3, 5, 9],
+            B: [2, 4, 8, 7],
+            C: [10, 1, 5, 6],
+            D: [9, 8, 3, 4],
+            E: [1, 10, 2, 7],
+        };
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 8.487054, lng: 76.95254 }, // TVM coordinates
+                zoom: 12,
+            });
+        
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        const userLatLng = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        setUserMarker(userLatLng);
+                    },
+                    error => {
+                        console.error(error);
+                    }
+                );
+            } else {
+                console.error('Geolocation is not supported by this browser.');
+            }
+        
+            busData.forEach(bus => {
+                const marker = new google.maps.Marker({
+                    position: { lat: bus.latitude, lng: bus.longitude },
+                    map: map,
+                    label: {
+                        text: bus.name,
+                        fontWeight: 'bold',
+                        color: '#FFFFFF', // White color
+                    },
+                    id: bus.id,
+                    route: bus.route,
+                });
+        
+                marker.addListener('click', () => showBusInfo(bus, marker));
+                markers.push(marker);
+            });
+        
+            if (userMarker) {
+                map.setCenter(userMarker.getPosition());
+            }
+        }
+        
+        function setUserMarker(userLatLng) {
+            userMarker = new google.maps.Marker({
+                position: userLatLng,
+                map: map,
+                label: {
+                    text: 'Your Location',
+                    fontWeight: 'bold',
+                    color: '#FFFFFF', // White color
+                },
+                icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+            });
+        }
+        
+        
+
+        function showBusInfo(bus, marker) {
+            const busList = document.getElementById('bus-list');
+            const busItem = document.createElement('li');
+            busItem.className = 'bus-item';
+            const distance = calculateDistance(userMarker.getPosition(), marker.getPosition());
+            const estimatedTime = calculateEstimatedTime(distance);
+        
+            busItem.innerHTML = `<strong>${bus.name}</strong><br>Latitude: ${bus.latitude}<br>Longitude: ${bus.longitude}<br>Distance: ${distance.toFixed(2)} km<br>Route: ${bus.route}<br>Estimated Time: ${estimatedTime.minutes} minutes ${estimatedTime.seconds} seconds`;
+            busItem.addEventListener('click', () => centerMapOnBus(bus));
+            busList.appendChild(busItem);
+        }
+        
+
+        function centerMapOnBus(bus) {
+            const marker = markers.find(m => m.id === bus.id);
+            if (marker) {
+                map.setCenter(marker.getPosition());
+            }
+        }
+
+        function calculateDistance(point1, point2) {
+            const R = 6371;
+            const dLat = deg2rad(point2.lat() - point1.lat());
+            const dLon = deg2rad(point2.lng() - point1.lng());
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(point1.lat())) * Math.cos(deg2rad(point2.lat())) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+            return distance;
+        }
+
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
+        function calculateEstimatedTime(distance) {
+            const averageSpeed = 30;
+            const estimatedTimeInHours = distance / averageSpeed;
+            const estimatedTimeInMinutes = Math.floor(estimatedTimeInHours * 60);
+            const seconds = Math.floor((estimatedTimeInHours * 60 - estimatedTimeInMinutes) * 60);
+        
+            return { minutes: estimatedTimeInMinutes, seconds: seconds };
+        }
+
+       function searchBuses() {
+    const stopInput = document.getElementById('bus-search').value.trim().toLowerCase(); // Convert to lowercase
+
+    // Map input strings to corresponding stop numbers
+    const stopMappings = {
+        'mananthala': 1,
+        'nalanchira': 2,
+        'kesavadasapuram': 3,
+        'ulloor': 4,
+        'pattom': 5,
+        'pmg': 6,
+        'medical college': 7,
+        'sreekaryam': 8,
+        'aakulam': 9,
+        'thampanoor': 10
+    };
+
+    // Check if the input matches any predefined place names
+    if (stopMappings.hasOwnProperty(stopInput)) {
+        const stop = stopMappings[stopInput];
+
+        const filteredBuses = busData.filter(bus => routeStops[bus.route].includes(stop));
+
+        // Sort filtered buses by distance in increasing order
+        filteredBuses.sort((a, b) => {
+            const distanceA = calculateDistance(userMarker.getPosition(), getBusMarkerById(a.id).getPosition());
+            const distanceB = calculateDistance(userMarker.getPosition(), getBusMarkerById(b.id).getPosition());
+            return distanceA - distanceB;
+        });
+
+        displayFilteredBuses(filteredBuses);
+    } else {
+        alert('Please enter a valid place name.');
+    }
+}
+
+
+        function getBusMarkerById(busId) {
+            return markers.find(marker => marker.id === busId);
+        }
+
+        function displayFilteredBuses(filteredBuses) {
+            const busList = document.getElementById('bus-list');
+            busList.innerHTML = ''; // Clear previous list
+        
+            markers.forEach(marker => marker.setMap(null));
+        
+            filteredBuses.forEach(bus => {
+                const marker = getBusMarkerById(bus.id);
+                const distance = calculateDistance(userMarker.getPosition(), marker.getPosition());
+                const estimatedTime = calculateEstimatedTime(distance);
+        
+                const busItem = document.createElement('li');
+                busItem.className = 'bus-item';
+                busItem.innerHTML = `<strong>${bus.name}</strong><br>Latitude: ${bus.latitude}<br>Longitude: ${bus.longitude}<br>Distance: ${distance.toFixed(2)} km<br>Route: ${bus.route}<br>Estimated Time: ${estimatedTime.minutes} minutes ${estimatedTime.seconds} seconds`;
+                busItem.addEventListener('click', () => centerMapOnBus(bus));
+                busList.appendChild(busItem);
+        
+                marker.setMap(map);
+            });
+        }
+
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAbIczYb5ovNmK6DtuMMqfrtMKZmBG552U&callback=initMap" async defer></script>
+</body>
+
+</html>
+
