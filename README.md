@@ -50,11 +50,6 @@ The JavaScript file handles the dynamic functionalities of the Bus Tracking Syst
 - **Stop Name Mapping:** Defines a mapping between predefined stop names and corresponding stop numbers.
 - **Search Buses Function:** Filters buses based on user input (stop name) and updates the UI.
 
-## Usage and Setup
-
-1. Clone the repository: `git clone https://github.com/your-username/bus-tracking-system.git`
-2. Open `index.html` in a modern web browser.
-3. Ensure that the browser supports geolocation for accurate user positioning.
 
 ## Dependencies
 
